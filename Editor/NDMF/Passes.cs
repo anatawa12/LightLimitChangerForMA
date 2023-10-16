@@ -16,6 +16,7 @@ namespace io.github.azukimochi
             .Run(NormalizeMaterials).Then
             .Run(GenerateAdditionalControl).Then
             .Run(GenerateAnimations).Then
+            .Run(GeneratePreset).Then
             .Run(Finalize);
         }
 
@@ -23,6 +24,7 @@ namespace io.github.azukimochi
         public readonly static NormalizeMaterialsPass NormalizeMaterials = new NormalizeMaterialsPass();
         public readonly static GenerateAdditionalControlPass GenerateAdditionalControl = new GenerateAdditionalControlPass();
         public readonly static GenerateAnimationsPass GenerateAnimations = new GenerateAnimationsPass();
+        public readonly static GeneratePresetPass GeneratePreset = new GeneratePresetPass();
         public readonly static FinalizePass Finalize = new FinalizePass();
 
         internal const string ParameterName_Toggle = "LightLimitEnable";
@@ -33,6 +35,7 @@ namespace io.github.azukimochi
         internal const string ParameterName_Unlit = "LightLimitUnlit";
         internal const string ParameterName_ColorTemp = "LightLimitColorTemp";
         internal const string ParameterName_Reset = "LightLimitReset";
+        internal const string ParameterName_Preset = "LightLimitPreset";
 
         private static Session GetSession(BuildContext context)
         {
@@ -72,6 +75,7 @@ namespace io.github.azukimochi
             public ControlAnimationContainer[] Controls;
             public AnimatorController Controller;
             public LightLimitControlType TargetControl;
+            public LightLimitChangerPreset[] Presets;
 
             public HashSet<Object> Excludes;
 
@@ -110,6 +114,8 @@ namespace io.github.azukimochi
                 Controls = controls.ToArray();
 
                 TargetControl = parameters.GetControlTypeFlags();
+
+                Presets = Settings.GetComponentsInChildren<LightLimitChangerPreset>();
 
                 _initialized = true;
             }
