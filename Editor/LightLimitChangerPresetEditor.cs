@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Xml.Linq;
 using UnityEditor;
+using UnityEditorInternal;
 using UnityEngine;
 
 namespace io.github.azukimochi
@@ -8,103 +10,100 @@ namespace io.github.azukimochi
     [CustomEditor(typeof(LightLimitChangerPreset))]
     internal sealed class LightLimitChangerPresetEditor : Editor
     {
+        private SerializedProperty _name;
         private SerializedProperty _enable;
 
-        private SerializedProperty _light;
-        private SerializedProperty _lightMin;
-        private SerializedProperty _lightMax;
-        private SerializedProperty _saturation;
-        private SerializedProperty _colorTemperature;
-        private SerializedProperty _unlit;
+        private SerializedProperty _parameters;
 
 
         private void OnEnable()
         {
-            _enable = new SerializedObject((serializedObject.targetObject as Component).gameObject).FindProperty("m_IsActive");
-            _light = serializedObject.FindProperty(nameof(LightLimitChangerPreset.Light));
-            _lightMin = serializedObject.FindProperty(nameof(LightLimitChangerPreset.LightMin));
-            _lightMax = serializedObject.FindProperty(nameof(LightLimitChangerPreset.LightMax));
-            _saturation = serializedObject.FindProperty(nameof(LightLimitChangerPreset.Saturation));
-            _colorTemperature = serializedObject.FindProperty(nameof(LightLimitChangerPreset.ColorTemperature));
-            _unlit = serializedObject.FindProperty(nameof(LightLimitChangerPreset.Unlit));
+            var obj = new SerializedObject((serializedObject.targetObject as Component).gameObject);
+            _name = obj.FindProperty("m_Name");
+            _enable = obj.FindProperty("m_IsActive");
+            _parameters = serializedObject.FindProperty(nameof(LightLimitChangerPreset.Parameters));
         }
 
         public override void OnInspectorGUI()
         {
-            var parent = (target as LightLimitChangerPreset).GetParent();
-            if (parent == null)
+            var settings = (target as LightLimitChangerPreset).GetParent();
+            if (settings == null)
             {
                 // TODO: プリセットがLLCの配下にないので警告を出す
                 return;
             }
             serializedObject.Update();
-            _enable.serializedObject.Update();
+            _name.serializedObject.Update();
 
             EditorGUI.BeginChangeCheck();
+            EditorGUILayout.PropertyField(_name);
             EditorGUILayout.PropertyField(_enable);
             if (EditorGUI.EndChangeCheck())
             {
-                _enable.serializedObject.ApplyModifiedProperties();
+                _name.serializedObject.ApplyModifiedProperties();
             }
 
-            EditorGUI.BeginDisabledGroup(parent.Parameters.IsSeparateLightControl);
-            DrawProperty(_light);
-            EditorGUI.EndDisabledGroup();
+            int count = _parameters.arraySize;
+            var targetControl = settings.Parameters.GetControlTypeFlags();
+            for (int i = 0; i < count; i++)
+            {
+                var property = _parameters.GetArrayElementAtIndex(i);
 
-            EditorGUI.BeginDisabledGroup(!parent.Parameters.IsSeparateLightControl);
-            DrawProperty(_lightMin);
-            DrawProperty(_lightMax);
-            EditorGUI.EndDisabledGroup();
+                var type = (LightLimitControlType)property.FindPropertyRelative(nameof(LightLimitChangerPreset.Parameter.Type)).intValue;
+                bool isLightingControl = LightLimitControlType.Light.HasFlag(type);
 
-            EditorGUILayout.Separator();
+                bool disabled;
+                if (type == LightLimitControlType.Light)
+                    disabled = settings.Parameters.IsSeparateLightControl;
+                else if (isLightingControl)
+                    disabled = !settings.Parameters.IsSeparateLightControl;
+                else
+                    disabled = !targetControl.HasFlag(type);
 
-            var control = parent.Parameters.GetControlTypeFlags();
 
-            EditorGUI.BeginDisabledGroup(!control.HasFlag(LightLimitControlType.ColorTemperature));
-            DrawProperty(_colorTemperature);
-            EditorGUI.EndDisabledGroup();
-
-            EditorGUI.BeginDisabledGroup(!control.HasFlag(LightLimitControlType.Saturation));
-            DrawProperty(_saturation);
-            EditorGUI.EndDisabledGroup();
-
-            EditorGUI.BeginDisabledGroup(!control.HasFlag(LightLimitControlType.Unlit));
-            DrawProperty(_unlit);
-            EditorGUI.EndDisabledGroup();
+                EditorGUI.BeginDisabledGroup(disabled);
+                DrawProperty(property, 0, isLightingControl ? 10 : 1);
+                EditorGUI.EndDisabledGroup();
+            }
 
             serializedObject.ApplyModifiedProperties();
         }
 
-        private static void DrawProperty(SerializedProperty property, float min = 0, float max = 1) => DrawProperty(property, new GUIContent(property.displayName), min, max);
-
-        private static void DrawProperty(SerializedProperty property, GUIContent label, float min = 0, float max = 1)
+        private static void DrawProperty(SerializedProperty property, float min = 0, float max = 1)
         {
+            var labelCache = _controlTypeLabelCache;
+            if (labelCache == null)
+            {
+                labelCache = new Dictionary<int, GUIContent>();
+                foreach(var v in Enum.GetValues(typeof(LightLimitControlType)))
+                {
+                    var idx = (int)v;
+                    labelCache.Add(idx, new GUIContent(((LightLimitControlType)v).ToString()));
+                }
+                _controlTypeLabelCache = labelCache;
+            }
+
             var rect = EditorGUILayout.GetControlRect(true);
-            label = EditorGUI.BeginProperty(rect, label, property);
+            var label = EditorGUI.BeginProperty(rect, labelCache[property.FindPropertyRelative(nameof(LightLimitChangerPreset.Parameter.Type)).intValue], property);
 
             var enable = property.FindPropertyRelative(nameof(LightLimitChangerPreset.Parameter.Enable));
             var value = property.FindPropertyRelative(nameof(LightLimitChangerPreset.Parameter.Value));
 
             var labelRect = rect;
-            var checkBoxRect = rect;
             var sliderRect = rect;
 
-            labelRect.width = EditorGUIUtility.labelWidth + 1.5f; // nazo margin...
-            checkBoxRect.width = checkBoxRect.height;
-            checkBoxRect.x += labelRect.width;
+            labelRect.width = EditorGUIUtility.labelWidth; 
+            sliderRect.width -= labelRect.width;
+            sliderRect.x += labelRect.width;
 
-            sliderRect.width -= labelRect.width + checkBoxRect.width + 8;
-            sliderRect.x += labelRect.width + checkBoxRect.width + 8;
-
-            EditorGUI.LabelField(labelRect, label);
-
-            EditorGUI.PropertyField(checkBoxRect, enable, GUIContent.none);
+            enable.boolValue = EditorGUI.ToggleLeft(labelRect, label, enable.boolValue);
             EditorGUI.BeginDisabledGroup(!enable.boolValue);
             value.floatValue = EditorGUI.Slider(sliderRect, value.floatValue, min, max);
             EditorGUI.EndDisabledGroup();
 
-
             EditorGUI.EndProperty();
         }
+
+        private static Dictionary<int, GUIContent> _controlTypeLabelCache;
     }
 }
