@@ -95,8 +95,27 @@ namespace io.github.azukimochi
             if (!IsWindowMode)
             {
                 EditorGUILayout.Separator();
+                if (GUILayout.Button(Localization.G("label.add_preset")))
+                {
+                    AddPreset();
+                }
+                EditorGUILayout.Separator();
                 Localization.ShowLocalizationUI();
             }
+        }
+
+        private void AddPreset()
+        {
+            var settings = target as LightLimitChangerSettings;
+            var obj = settings.gameObject;
+            var presets = obj.GetComponentsInChildren<LightLimitChangerPreset>(true);
+            string presetName = $"{Localization.S("preset")}{presets.Length + 1}";
+
+            var preset = new GameObject(presetName, typeof(LightLimitChangerPreset));
+            preset.GetComponent<LightLimitChangerPreset>().CopyLightSettingsFromParameters(settings.Parameters);
+            Undo.RegisterCreatedObjectUndo(preset, presetName);
+
+            preset.transform.parent = obj.transform;
         }
     }
 }
