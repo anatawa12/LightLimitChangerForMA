@@ -78,7 +78,7 @@ namespace io.github.azukimochi
                 foreach(var v in Enum.GetValues(typeof(LightLimitControlType)))
                 {
                     var idx = (int)v;
-                    labelCache.Add(idx, new GUIContent(((LightLimitControlType)v).ToString()));
+                    labelCache.Add(idx, new GUIContent(ObjectNames.NicifyVariableName(((LightLimitControlType)v).ToString())));
                 }
                 _controlTypeLabelCache = labelCache;
             }
