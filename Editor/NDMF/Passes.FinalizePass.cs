@@ -37,6 +37,19 @@ namespace io.github.azukimochi
                     localOnly = x.name == ParameterName_Reset
                 }));
 
+                if (session.Presets.Length != 0)
+                {
+                    maParameters.parameters.Add(new ParameterConfig()
+                    {
+                        nameOrPrefix = ParameterName_Preset,
+                        internalParameter = true,
+                        syncType = ParameterSyncType.Int,
+                        defaultValue = 0,
+                        saved = false,
+                        localOnly = true
+                    });
+                }
+
                 menuInstaller.menuToAppend = CreateMenu(session, cache);
 
                 foreach(var component in context.AvatarRootObject.GetComponentsInChildren<LightLimitChangerSettings>(true))
@@ -101,6 +114,33 @@ namespace io.github.azukimochi
                             }
                         },
                     });
+                }
+
+                if (session.Presets.Length != 0)
+                {
+                    var menu = ScriptableObject.CreateInstance<VRCExpressionsMenu>().AddTo(cache);
+                    menu.name = "Presets";
+
+                    mainMenu.controls.Add(new VRCExpressionsMenu.Control
+                    {
+                        name = menu.name,
+                        type = VRCExpressionsMenu.Control.ControlType.SubMenu,
+                        icon = null, // ToDo
+                        subMenu = menu,
+                    });
+
+                    for (int i = 0; i < session.Presets.Length; i++)
+                    {
+                        var preset = session.Presets[i];
+                        menu.controls.Add(new VRCExpressionsMenu.Control
+                        {
+                            name = preset.name,
+                            type = VRCExpressionsMenu.Control.ControlType.Button,
+                            icon = null, // ToDo
+                            parameter = new VRCExpressionsMenu.Control.Parameter() { name = ParameterName_Preset },
+                            value = i + 1,
+                        });
+                    }
                 }
 
                 if (session.Parameters.AddResetButton)
